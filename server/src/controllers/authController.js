@@ -11,6 +11,7 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: req.body.email }).select('+passwordHash');
   if (!user || !await bcrypt.compare(req.body.password, user.passwordHash)) return res.status(401).json({ message: 'Invalid email or password' });
+  if (req.body.role && user.role !== req.body.role) return res.status(403).json({ message: `This account is registered as ${user.role}, not ${req.body.role}` });
   res.json({ token: signToken(user), user: publicUser(user) });
 });
 export const me = (req, res) => res.json({ user: publicUser(req.user) });
