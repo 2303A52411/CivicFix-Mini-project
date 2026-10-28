@@ -18,7 +18,7 @@ describe('CivicFix API',()=>{
    expect((await request(app).patch(`/api/issues/${id}/resolve`).set(auth('reporter')).send({resolutionNote:'Reporter cannot resolve this'})).status).toBe(403);
    expect((await request(app).patch(`/api/issues/${id}/resolve`).set(auth('viewer')).send({resolutionNote:'Viewer cannot resolve this'})).status).toBe(403);
    expect((await request(app).get('/api/coordinator/summary').set(auth('viewer'))).status).toBe(403);
-   expect((await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({status:'In Progress'})).status).toBe(400);
+   expect((await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({status:'Not A Status'})).status).toBe(400);
    expect((await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({status:'Under Review',note:'Complaint details verified'})).status).toBe(200);
    expect((await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({status:'In Progress',note:'Electrician assigned'})).status).toBe(200);
    expect((await request(app).patch(`/api/issues/${id}/resolve`).set(auth('coordinator')).send({resolutionNote:'No'})).status).toBe(400);

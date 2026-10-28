@@ -1,11 +1,11 @@
 import IssueUpdate from '../models/IssueUpdate.js';
 
 export const STATUS_TRANSITIONS = {
-  Submitted: ['Under Review', 'Rejected'],
-  'Under Review': ['In Progress', 'Rejected'],
-  'In Progress': ['Resolved', 'Under Review'],
-  Resolved: ['In Progress'],
-  Rejected: ['Under Review']
+  Submitted: ['Under Review', 'In Progress', 'Resolved', 'Rejected'],
+  'Under Review': ['Submitted', 'In Progress', 'Resolved', 'Rejected'],
+  'In Progress': ['Submitted', 'Under Review', 'Resolved', 'Rejected'],
+  Resolved: ['Submitted', 'Under Review', 'In Progress', 'Rejected'],
+  Rejected: ['Submitted', 'Under Review', 'In Progress', 'Resolved']
 };
 
 export async function transitionIssue(issue, status, note, actorId, changes = {}) {
