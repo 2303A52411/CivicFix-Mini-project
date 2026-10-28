@@ -137,12 +137,13 @@ export default function Coordinator() {
               <div className="mt-4 grid grid-cols-2 gap-3"><Link className="btn-secondary" to={`/issues/${issue._id}`}>View details</Link><button className="btn-primary" onClick={() => openUpdate(issue)}>Update status</button></div>
             </div>)}
           </div>
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[1120px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>{['Issue title', 'Category', 'Description', 'Location', 'Priority', 'Status', 'Date', 'Actions'].map(heading => <th className="px-4 py-3" key={heading}>{heading}</th>)}</tr></thead>
+          <div className="hidden lg:block">
+            <table className="w-full table-fixed text-left text-sm">
+              <colgroup><col className="w-[25%]" /><col className="w-[11%]" /><col className="w-[17%]" /><col className="w-[9%]" /><col className="w-[12%]" /><col className="w-[11%]" /><col className="w-[15%]" /></colgroup>
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>{['Issue', 'Category', 'Location', 'Priority', 'Status', 'Date', 'Actions'].map(heading => <th className="px-3 py-3" key={heading}>{heading}</th>)}</tr></thead>
               <tbody>{issues.map(issue => <tr className="border-t border-slate-100 align-top" key={issue._id}>
-                <td className="px-4 py-4 font-bold">{issue.title}</td><td className="px-4 py-4 text-slate-500">{issue.category}</td><td className="max-w-64 px-4 py-4 text-slate-500"><p className="line-clamp-2">{issue.description}</p></td><td className="px-4 py-4 text-slate-500">{issue.locationText}</td><td className="px-4 py-4">{issue.priority}</td><td className="px-4 py-4"><StatusBadge status={issue.status} /></td><td className="whitespace-nowrap px-4 py-4 text-slate-500">{new Date(issue.createdAt).toLocaleDateString()}</td>
-                <td className="sticky right-0 bg-white px-4 py-4"><div className="flex flex-col items-start gap-2"><button className="font-bold text-brand-600" onClick={() => openUpdate(issue)}>Update status</button><Link className="font-semibold text-slate-500" to={`/issues/${issue._id}`}>View details</Link></div></td>
+                <td className="px-3 py-4"><p className="font-bold">{issue.title}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{issue.description}</p></td><td className="break-words px-3 py-4 text-slate-500">{issue.category}</td><td className="break-words px-3 py-4 text-slate-500">{issue.locationText}</td><td className="px-3 py-4">{issue.priority}</td><td className="px-3 py-4"><StatusBadge status={issue.status} /></td><td className="whitespace-nowrap px-3 py-4 text-slate-500">{new Date(issue.createdAt).toLocaleDateString()}</td>
+                <td className="px-3 py-4"><div className="flex flex-col items-start gap-2 whitespace-nowrap"><button className="font-bold text-brand-600" onClick={() => openUpdate(issue)}>Update status</button><Link className="font-semibold text-slate-500" to={`/issues/${issue._id}`}>View details</Link></div></td>
               </tr>)}</tbody>
             </table>
           </div>
