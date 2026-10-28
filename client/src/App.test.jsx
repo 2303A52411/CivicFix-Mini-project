@@ -11,7 +11,7 @@ vi.mock('./lib/api', () => ({ default: { get: vi.fn(() => Promise.resolve({ data
 describe('CivicFix app', () => {
   it('renders the landing page', () => {
     render(<MemoryRouter initialEntries={['/']}><ThemeProvider><AuthProvider><App/></AuthProvider></ThemeProvider></MemoryRouter>);
-    expect(screen.getByText(/Spot it. Report it./i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Report Today for a Better Tomorrow/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Switch to/i })).toBeInTheDocument();
   });
 });
