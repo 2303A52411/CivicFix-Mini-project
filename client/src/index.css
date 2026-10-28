@@ -8,4 +8,21 @@
   .field { @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-brand-500 focus:ring-4 focus:ring-brand-100; }
   .label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
   .card { @apply rounded-2xl border border-slate-100 bg-white shadow-card; }
+  .theme-toggle { @apply inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50; }
 }
+
+html.dark body { background: #07111f; color: #e6eef8; }
+html.dark .bg-white, html.dark .bg-white\/90 { background-color: #0d1b2e !important; }
+html.dark .bg-slate-50 { background-color: #07111f !important; }
+html.dark .card { background-color: #0d1b2e; border-color: #20324a; box-shadow: 0 12px 40px rgba(0,0,0,.28); }
+html.dark .field { background-color: #101f33; border-color: #2a3c55; color: #edf5ff; }
+html.dark .field::placeholder { color: #8291a7; }
+html.dark .theme-toggle, html.dark .btn-secondary { background-color: #101f33; border-color: #2a3c55; color: #dce8f5; }
+html.dark .theme-toggle:hover, html.dark .btn-secondary:hover { background-color: #172a42; }
+html.dark .text-ink, html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700 { color: #edf5ff !important; }
+html.dark .text-slate-600, html.dark .text-slate-500 { color: #a8b8cc !important; }
+html.dark .text-slate-400 { color: #8291a7 !important; }
+html.dark .border-slate-100, html.dark .border-slate-200 { border-color: #20324a !important; }
+html.dark thead, html.dark .bg-slate-100 { background-color: #101f33 !important; }
+html.dark tbody tr { border-color: #20324a !important; }
+html.dark .theme-toast { background: #101f33 !important; color: #edf5ff !important; }
