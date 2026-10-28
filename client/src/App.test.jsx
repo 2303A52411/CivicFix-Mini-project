@@ -1,0 +1,2 @@
+import '@testing-library/jest-dom/vitest'; import { describe,expect,it } from 'vitest'; import { render,screen } from '@testing-library/react'; import { MemoryRouter } from 'react-router-dom'; import { AuthProvider } from './context/AuthContext'; import App from './App';
+describe('CivicFix app',()=>{it('renders the landing page',()=>{render(<MemoryRouter initialEntries={['/']}><AuthProvider><App/></AuthProvider></MemoryRouter>);expect(screen.getByText(/Spot it. Report it./i)).toBeInTheDocument()})});

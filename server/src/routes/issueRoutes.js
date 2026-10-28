@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { addUpdate, createIssue, getIssue, listIssues, resolveIssue, updateStatus } from '../controllers/issueController.js';
+import { allow, protect } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { issueSchema, noteSchema, resolveSchema, statusSchema } from '../validators/schemas.js';
+const router = Router();
+router.get('/', listIssues);
+router.get('/:id', getIssue);
+router.post('/', protect, allow('reporter'), validate(issueSchema), createIssue);
+router.patch('/:id/status', protect, allow('coordinator'), validate(statusSchema), updateStatus);
+router.post('/:id/updates', protect, allow('coordinator'), validate(noteSchema), addUpdate);
+router.patch('/:id/resolve', protect, allow('coordinator'), validate(resolveSchema), resolveIssue);
+export default router;
