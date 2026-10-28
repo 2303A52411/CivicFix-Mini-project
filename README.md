@@ -23,11 +23,10 @@ npm run dev
 
 Open `http://localhost:5173`. The API runs at `http://localhost:5050` (port 5000 is commonly reserved by macOS AirPlay).
 
-Demo accounts created by `npm run seed` (all use password `CivicFix123`):
+Development role accounts created by `npm run seed` (both use password `CivicFix123`):
 
 | Role | Email |
 |---|---|
-| Reporter | reporter@civicfix.test |
 | Coordinator | coordinator@civicfix.test |
 | Viewer | viewer@civicfix.test |
 
@@ -39,7 +38,7 @@ Never commit `.env`. Use a long random `JWT_SECRET` outside local development. P
 npm run dev       # API and client with hot reload
 npm run build     # production client build
 npm test          # server and client test suites
-npm run seed      # reset and load realistic demo records
+npm run seed      # safely provision Coordinator and Viewer; never deletes data
 npm run verify:persistence # execute real API + MongoDB workflow verification
 npm start         # start the API
 ```
@@ -127,7 +126,7 @@ Set `MONGODB_URI` in `server/.env`. For local MongoDB, the default is:
 MONGODB_URI=mongodb://127.0.0.1:27017/civicfix
 ```
 
-Start MongoDB, run `npm run dev`, and then run `npm run verify:persistence` in another terminal. The verifier registers a reporter through the API, submits **Streetlight Not Working**, checks the MongoDB document directly, checks My Reports and filters, confirms a reporter receives `403` for a status update, signs in as the seeded coordinator, advances and resolves the issue, and verifies the timeline and summary counts.
+Start MongoDB, run `npm run dev`, and then run `npm run verify:persistence` in another terminal. The verifier registers a clearly labeled test reporter through the API, submits **Streetlight Not Working**, checks the MongoDB document directly, checks My Reports and filters, confirms a reporter receives `403` for a status update, signs in as the development coordinator, advances and resolves the issue, and verifies the timeline and summary counts. Run `npm run clean:demo -w server` afterward to remove only these known test fixtures.
 
 After restarting `npm run dev`, confirm the exact same record remains:
 

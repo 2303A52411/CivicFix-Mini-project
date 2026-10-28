@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "test": "vitest run",
     "seed": "node src/seed.js",
-    "verify:persistence": "node scripts/verifyPersistence.js"
+    "verify:persistence": "node scripts/verifyPersistence.js",
+    "clean:demo": "node scripts/cleanDemoData.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
