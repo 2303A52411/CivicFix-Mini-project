@@ -3,7 +3,6 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import authCommunityImage from '../assets/civicfix-auth-community.png';
-import ThemeToggle from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 
 const roles = ['reporter', 'coordinator', 'viewer'];
@@ -56,7 +55,6 @@ export default function AuthPage({ mode }) {
 
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-20 sm:px-10">
       <div className="absolute -right-32 top-0 h-96 w-96 rounded-full bg-brand-100/70" /><div className="absolute -bottom-36 -left-20 h-80 w-80 rounded-full bg-teal-100/70" />
-      <div className="absolute right-5 top-5 z-20"><ThemeToggle /></div>
       <form onSubmit={submit} className="card relative z-10 w-full max-w-xl rounded-[2rem] border-white/80 bg-white/95 p-7 shadow-2xl backdrop-blur sm:p-10">
         <Link to="/" className="mb-8 flex items-center gap-2 text-xl font-extrabold lg:hidden"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-brand-600 text-white"><Leaf className="h-5 w-5" /></span>CivicFix</Link>
         <p className="text-sm font-bold uppercase tracking-wide text-brand-600">{register ? 'Join the community' : 'Welcome back'}</p>

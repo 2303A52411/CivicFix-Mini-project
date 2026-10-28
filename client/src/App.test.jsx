@@ -12,6 +12,6 @@ describe('CivicFix app', () => {
   it('renders the landing page', () => {
     render(<MemoryRouter initialEntries={['/']}><ThemeProvider><AuthProvider><App/></AuthProvider></ThemeProvider></MemoryRouter>);
     expect(screen.getByRole('heading', { name: /Report Today for a Better Tomorrow/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Switch to/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Switch to/i })).not.toBeInTheDocument();
   });
 });
