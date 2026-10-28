@@ -1,19 +1,82 @@
-import { ArrowRight, CheckCircle2, Clock3, FilePlus2, ListChecks } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock3, FilePlus2, ListChecks, MapPin, Megaphone, Plus, Search, UsersRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
-import IssueCard from '../components/IssueCard';
+import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
+import landingHero from '../assets/civicfix-landing-hero.png';
+
+const priorityStyle = { Low:'bg-emerald-50 text-emerald-700', Medium:'bg-amber-50 text-amber-700', High:'bg-rose-50 text-rose-700', Urgent:'bg-red-50 text-red-700' };
 
 export default function ReporterDashboard() {
+  const { user } = useAuth();
   const [issues, setIssues] = useState([]);
+  const [community, setCommunity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  useEffect(() => { api.get('/me/issues').then(({ data }) => setIssues(data.issues)).catch(e => setError(e.response?.data?.message || 'Could not load your reports')).finally(() => setLoading(false)); }, []);
-  const stats = useMemo(() => ({ total: issues.length, active: issues.filter(i => !['Resolved', 'Rejected'].includes(i.status)).length, resolved: issues.filter(i => i.status === 'Resolved').length }), [issues]);
+
+  useEffect(() => {
+    Promise.all([api.get('/me/issues'), api.get('/issues', { params: { limit: 5 } })])
+      .then(([mine, all]) => {
+        setIssues(mine.data.issues || []);
+        setCommunity((all.data.issues || []).slice(0, 3));
+      })
+      .catch(e => setError(e.response?.data?.message || 'Could not load your dashboard'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = useMemo(() => ({
+    total: issues.length,
+    open: issues.filter(i => !['Resolved', 'Rejected'].includes(i.status)).length,
+    progress: issues.filter(i => i.status === 'In Progress').length,
+    resolved: issues.filter(i => i.status === 'Resolved').length,
+  }), [issues]);
+
   if (loading) return <div className="py-24 text-center text-slate-400">Loading your dashboard…</div>;
   if (error) return <div className="card py-20 text-center text-rose-700">{error}</div>;
-  return <><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold text-brand-600">REPORTER DASHBOARD</p><h1 className="mt-1 text-3xl font-extrabold">Your community activity</h1><p className="mt-2 text-slate-500">Report problems and follow every step toward resolution.</p></div><Link to="/report" className="btn-primary"><FilePlus2 className="h-4 w-4"/>Report an issue</Link></div>
-  <div className="mt-7 grid gap-4 sm:grid-cols-3">{[[ListChecks,'Total reports',stats.total,'bg-blue-50 text-blue-700'],[Clock3,'Active',stats.active,'bg-amber-50 text-amber-700'],[CheckCircle2,'Resolved',stats.resolved,'bg-emerald-50 text-emerald-700']].map(([Icon,label,value,color])=><div className="card flex items-center gap-4 p-5" key={label}><span className={`grid h-12 w-12 place-items-center rounded-2xl ${color}`}><Icon/></span><div><p className="text-sm text-slate-500">{label}</p><b className="text-2xl">{value}</b></div></div>)}</div>
-  <div className="mt-8 flex items-center justify-between"><h2 className="text-xl font-bold">Recent reports</h2><Link to="/my-reports" className="flex items-center gap-1 text-sm font-bold text-brand-600">View all <ArrowRight className="h-4 w-4"/></Link></div>
-  {issues.length ? <div className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{issues.slice(0,3).map(i=><IssueCard key={i._id} issue={i}/>)}</div> : <div className="card mt-4 py-16 text-center"><h3 className="font-bold">No reports yet</h3><p className="mt-1 text-sm text-slate-500">Submit your first community issue to begin tracking it.</p><Link to="/report" className="btn-primary mt-5">Create first report</Link></div>}</>;
+
+  const cards = [
+    [ListChecks, 'Total reports', stats.total, 'bg-blue-50 text-blue-700', '/my-reports'],
+    [Clock3, 'Open reports', stats.open, 'bg-orange-50 text-orange-700', '/my-reports'],
+    [Search, 'In progress', stats.progress, 'bg-violet-50 text-violet-700', '/my-reports'],
+    [CheckCircle2, 'Resolved', stats.resolved, 'bg-emerald-50 text-emerald-700', '/my-reports'],
+  ];
+
+  return <div className="space-y-6">
+    <section className="relative overflow-hidden rounded-3xl bg-sky-50 px-6 py-9 sm:px-8 lg:min-h-52">
+      <img src={landingHero} alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-90"/>
+      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/10"/>
+      <div className="relative z-10 max-w-xl">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-brand-600">Reporter dashboard</p>
+        <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome back, <span className="text-brand-600">{user?.name?.split(' ')[0] || 'Reporter'}!</span></h1>
+        <p className="mt-3 max-w-lg leading-7 text-slate-600">Report problems and follow every step toward a cleaner, safer, and happier community.</p>
+        <Link to="/report" className="btn-primary mt-6"><Plus className="h-4 w-4"/>Report an issue <ArrowRight className="h-4 w-4"/></Link>
+      </div>
+    </section>
+
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map(([Icon,label,value,color,to]) => <Link to={to} className="card group flex items-center gap-4 p-5 transition hover:-translate-y-1 hover:shadow-lg" key={label}>
+        <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${color}`}><Icon className="h-6 w-6"/></span>
+        <div className="min-w-0"><p className="text-sm text-slate-500">{label}</p><b className="text-2xl">{value}</b><p className="mt-1 flex items-center gap-1 text-xs font-semibold text-brand-600">View reports <ArrowRight className="h-3 w-3 transition group-hover:translate-x-1"/></p></div>
+      </Link>)}
+    </section>
+
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(290px,.8fr)]">
+      <section>
+        <div className="mb-4 flex items-end justify-between gap-4"><div><h2 className="text-2xl font-extrabold">Recent reports</h2><p className="mt-1 text-sm text-slate-500">Your latest reported issues and their current status.</p></div><Link to="/my-reports" className="flex shrink-0 items-center gap-1 text-sm font-bold text-brand-600">View all <ArrowRight className="h-4 w-4"/></Link></div>
+        {issues.length ? <div className="card overflow-hidden">{issues.slice(0,4).map((issue,index) => <Link to={`/issues/${issue._id}`} className={`grid gap-4 p-4 transition hover:bg-slate-50 sm:grid-cols-[100px_1fr_auto] sm:items-center ${index?'border-t border-slate-100':''}`} key={issue._id}>
+          <div className="h-20 overflow-hidden rounded-xl bg-gradient-to-br from-sky-100 to-emerald-100">{issue.imageUrl?<img src={issue.imageUrl} alt="" className="h-full w-full object-cover"/>:<span className="grid h-full place-items-center"><Megaphone className="text-brand-500"/></span>}</div>
+          <div className="min-w-0"><h3 className="truncate font-bold">{issue.title}</h3><p className="mt-2 flex items-center gap-1 truncate text-sm text-slate-500"><MapPin className="h-4 w-4 text-brand-500"/>{issue.locationText}</p><p className="mt-1 line-clamp-1 text-xs text-slate-400">{issue.description}</p></div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end"><StatusBadge status={issue.status}/><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${priorityStyle[issue.priority] || priorityStyle.Medium}`}>{issue.priority}</span><ArrowRight className="h-4 w-4 text-slate-400"/></div>
+        </Link>)}</div> : <div className="card py-14 text-center"><h3 className="font-bold">No reports yet</h3><p className="mt-1 text-sm text-slate-500">Submit your first community issue to begin tracking it.</p><Link to="/report" className="btn-primary mt-5">Create first report</Link></div>}
+      </section>
+
+      <aside className="space-y-5">
+        <section className="card p-5"><div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-extrabold"><UsersRound className="h-5 w-5 text-brand-600"/>Community activity</h2><Link to="/issues" className="text-xs font-bold text-brand-600">View all</Link></div><p className="mt-1 text-xs text-slate-500">Latest issues from your community.</p><div className="mt-4 space-y-4">{community.length?community.map(issue=><Link to={`/issues/${issue._id}`} className="flex items-center gap-3" key={issue._id}><span className="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100">{issue.imageUrl?<img src={issue.imageUrl} alt="" className="h-full w-full object-cover"/>:<Megaphone className="h-4 w-4 text-brand-500"/>}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm">{issue.title}</b><span className="block truncate text-xs text-slate-500">{issue.locationText}</span></span><StatusBadge status={issue.status}/></Link>):<p className="py-4 text-sm text-slate-400">No community activity yet.</p>}</div></section>
+        <section className="card p-5"><h2 className="font-extrabold">Quick actions</h2><div className="mt-4 grid grid-cols-2 gap-3">{[[FilePlus2,'Report issue','/report'],[ListChecks,'My reports','/my-reports'],[UsersRound,'Community','/issues'],[Search,'Track issues','/my-reports']].map(([Icon,label,to])=><Link to={to} className="rounded-xl bg-slate-50 p-3 text-sm font-bold transition hover:bg-brand-50 hover:text-brand-700" key={label}><Icon className="mb-2 h-5 w-5 text-brand-600"/>{label}</Link>)}</div></section>
+      </aside>
+    </div>
+
+    <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 to-sky-500 p-6 text-white"><div><h2 className="text-xl font-extrabold">Together for cleaner communities</h2><p className="mt-1 text-sm text-blue-100">Your reports help create safer, cleaner, and more livable neighbourhoods.</p></div><Link to="/report" className="btn-secondary">Report an issue <ArrowRight className="h-4 w-4"/></Link></section>
+  </div>;
 }
