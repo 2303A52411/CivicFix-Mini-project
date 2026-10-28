@@ -22,8 +22,11 @@ const buildFilter = query => {
 export const listIssues = asyncHandler(async (req, res) => {
   const page = Math.max(Number(req.query.page) || 1, 1), limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 50);
   const filter = buildFilter(req.query);
+  const issueQuery = Issue.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
+  if (req.user.role === 'viewer') issueQuery.select('title category locationText priority status createdAt');
+  else issueQuery.populate('reporterId', 'name');
   const [issues, total] = await Promise.all([
-    Issue.find(filter).populate('reporterId', 'name').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Issue.countDocuments(filter)
+    issueQuery, Issue.countDocuments(filter)
   ]);
   res.json({ issues, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 });
@@ -34,9 +37,16 @@ export const myIssues = asyncHandler(async (req, res) => {
 });
 
 export const getIssue = asyncHandler(async (req, res) => {
-  const issue = await Issue.findById(req.params.id).populate('reporterId', 'name');
+  const viewer = req.user.role === 'viewer';
+  const issueQuery = Issue.findById(req.params.id);
+  if (viewer) issueQuery.select('-reporterId');
+  else issueQuery.populate('reporterId', 'name');
+  const issue = await issueQuery;
   if (!issue) return res.status(404).json({ message: 'Issue not found' });
-  const updates = await IssueUpdate.find({ issueId: issue._id }).populate('actorId', 'name role').sort({ createdAt: 1 });
+  const updatesQuery = IssueUpdate.find({ issueId: issue._id }).sort({ createdAt: 1 });
+  if (viewer) updatesQuery.select('oldStatus newStatus createdAt');
+  else updatesQuery.populate('actorId', 'name role');
+  const updates = await updatesQuery;
   res.json({ issue, updates });
 });
 

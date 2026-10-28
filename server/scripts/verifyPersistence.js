@@ -25,7 +25,8 @@ if (mode === 'check') {
   const issue = reporter && await Issue.findOne({ reporterId: reporter._id, title });
   const updates = issue ? await IssueUpdate.countDocuments({ issueId: issue._id }) : 0;
   if (!reporter || !issue || issue.status !== 'Resolved' || issue.resolutionNote !== 'Replaced the faulty lamp and tested the streetlight.' || updates !== 4) throw new Error('Persistence verification failed after restart');
-  const publicDetail = await request(`/issues/${issue._id}`);
+  const signedIn = await request('/auth/login', { method: 'POST', body: { email, password } });
+  const publicDetail = await request(`/issues/${issue._id}`, { token: signedIn.token });
   console.log(JSON.stringify({ persistedAfterRestart: true, userId: reporter._id, issueId: issue._id, status: issue.status, resolutionNote: issue.resolutionNote, resolvedAt: issue.resolvedAt, timelineEntries: publicDetail.updates.length }, null, 2));
   await mongoose.disconnect(); process.exit(0);
 }
