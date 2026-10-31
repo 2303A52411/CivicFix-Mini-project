@@ -2,9 +2,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest'; import { MongoMemoryServer } from 'mongodb-memory-server'; import mongoose from 'mongoose'; import bcrypt from 'bcryptjs';
 import app from '../src/app.js'; import User from '../src/models/User.js';
 let mongo; const tokens={};
-beforeAll(async()=>{process.env.JWT_SECRET='test-secret-with-enough-entropy';process.env.NODE_ENV='test';mongo=await MongoMemoryServer.create();await mongoose.connect(mongo.getUri())});
+beforeAll(async()=>{process.env.JWT_SECRET='test-secret-with-enough-entropy';process.env.NODE_ENV='test';mongo=await MongoMemoryServer.create();await mongoose.connect(mongo.getUri())},60000);
 beforeEach(async()=>{await mongoose.connection.dropDatabase();for(const role of ['reporter','coordinator','viewer']){await User.create({name:role,email:`${role}@test.com`,passwordHash:await bcrypt.hash('Password1',4),role});const r=await request(app).post('/api/auth/login').send({email:`${role}@test.com`,password:'Password1'});tokens[role]=r.body.token}});
-afterAll(async()=>{await mongoose.disconnect();await mongo.stop()});
+afterAll(async()=>{await mongoose.disconnect();await mongo.stop()},60000);
 const auth=role=>({Authorization:`Bearer ${tokens[role]}`});
 const issue={title:'Streetlight Not Working',category:'Electrical',description:'The streetlight near Block A is not working.',locationText:'Block A',priority:'High',imageUrl:''};
 describe('CivicFix API',()=>{
@@ -28,4 +28,22 @@ describe('CivicFix API',()=>{
    const detail=await request(app).get(`/api/issues/${id}`).set(auth('coordinator'));expect(detail.body.updates).toHaveLength(4);expect(detail.body.updates.map(update=>update.newStatus)).toEqual(['Submitted','Under Review','In Progress','Resolved']);expect(detail.body.updates.at(-1).actorId.role).toBe('coordinator');expect(detail.body.updates.at(-1).note).toBe('The electrician repaired the damaged streetlight successfully.');
    const viewerDetail=await request(app).get(`/api/issues/${id}`).set(auth('viewer'));expect(viewerDetail.status).toBe(200);expect(viewerDetail.body.issue.reporterId).toBeUndefined();expect(viewerDetail.body.issue.resolutionNote).toBe('The electrician repaired the damaged streetlight successfully.');expect(viewerDetail.body.updates).toHaveLength(4);expect(viewerDetail.body.updates.at(-1).actorId).toBeUndefined();expect(viewerDetail.body.updates.at(-1).note).toBeUndefined();
    const summary=await request(app).get('/api/coordinator/summary').set(auth('coordinator'));expect(summary.body.total).toBe(1);expect(summary.body.byStatus).toEqual({Submitted:0,'Under Review':0,'In Progress':0,Resolved:1,Rejected:0});expect(summary.body.open).toBe(0)});
+ it('detects duplicate issues and allows duplicate checking endpoint',async()=>{
+   await request(app).post('/api/issues').set(auth('reporter')).send(issue);
+   const checkRes = await request(app).post('/api/issues/check-duplicates').set(auth('reporter')).send({
+     title: 'Streetlight Not Working in Block A',
+     category: 'Electrical',
+     locationText: 'Block A'
+   });
+   expect(checkRes.status).toBe(200);
+   expect(checkRes.body.count).toBeGreaterThan(0);
+   expect(checkRes.body.potentialDuplicates[0].title).toBe('Streetlight Not Working');
+
+   const createdDuplicate = await request(app).post('/api/issues').set(auth('reporter')).send({
+     ...issue,
+     title: 'Streetlight Not Working Again'
+   });
+   expect(createdDuplicate.status).toBe(201);
+   expect(createdDuplicate.body.issue.isPotentialDuplicate).toBe(true);
+ });
 });

@@ -5,15 +5,27 @@ import { Link, useNavigate } from 'react-router-dom';
 import authCommunityImage from '../assets/civicfix-auth-community.png';
 import { useAuth } from '../context/AuthContext';
 
-const roles = ['reporter', 'coordinator', 'viewer'];
+const roles = ['reporter', 'coordinator'];
 
 export default function AuthPage({ mode }) {
   const register = mode === 'register';
-  const { login, register: signup } = useAuth();
+  const { login, register: signup, continueAsViewer } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'reporter' });
+
+  const handleGuestViewer = async () => {
+    setBusy(true);
+    try {
+      if (continueAsViewer) await continueAsViewer();
+      navigate('/viewer');
+    } catch {
+      navigate('/viewer');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async event => {
     event.preventDefault();
@@ -75,6 +87,17 @@ export default function AuthPage({ mode }) {
 
         <div className="my-7 flex items-center gap-4 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" /><ShieldCheck className="h-4 w-4" /><span className="h-px flex-1 bg-slate-200" /></div>
         <p className="text-center text-sm text-slate-500">{register ? 'Already have an account?' : 'New to CivicFix?'} <Link className="font-bold text-brand-600" to={register ? '/login' : '/register'}>{register ? 'Sign in' : 'Create an account'}</Link></p>
+        <div className="mt-5 rounded-2xl border border-brand-100 bg-brand-50/70 p-4 text-center">
+          <p className="text-xs text-slate-600">No account? Just want to see community progress?</p>
+          <button
+            type="button"
+            onClick={handleGuestViewer}
+            className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold text-brand-700 hover:text-brand-800 underline"
+          >
+            <Eye className="h-4 w-4" />
+            Browse issues as Public Viewer (No sign-in required) →
+          </button>
+        </div>
       </form>
     </section>
   </main>;

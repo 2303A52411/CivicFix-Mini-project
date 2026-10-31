@@ -12,7 +12,9 @@ const schema = new mongoose.Schema({
   status: { type: String, enum: STATUSES, default: 'Submitted', index: true },
   imageUrl: { type: String, trim: true, default: '' },
   resolutionNote: { type: String, trim: true, maxlength: 1000, default: '' },
-  resolvedAt: { type: Date, default: null }
+  resolvedAt: { type: Date, default: null },
+  isPotentialDuplicate: { type: Boolean, default: false, index: true },
+  possibleDuplicateIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Issue' }]
 }, { timestamps: true });
 schema.index({ title: 'text', description: 'text', locationText: 'text' });
 export default mongoose.model('Issue', schema);

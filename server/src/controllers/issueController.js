@@ -1,14 +1,71 @@
-import Issue, { STATUSES } from '../models/Issue.js';
+import Issue, { STATUSES, CATEGORIES, PRIORITIES } from '../models/Issue.js';
 import IssueUpdate from '../models/IssueUpdate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { transitionIssue } from '../services/issueService.js';
+import { findPotentialDuplicates } from '../services/duplicateService.js';
 
 const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+export const checkDuplicates = asyncHandler(async (req, res) => {
+  const data = req.method === 'POST' ? req.body : req.query;
+  const potentialDuplicates = await findPotentialDuplicates({
+    title: data.title || '',
+    category: data.category || '',
+    locationText: data.locationText || '',
+    excludeId: data.excludeId || null
+  });
+  res.json({ count: potentialDuplicates.length, potentialDuplicates });
+});
+
+export const getIssueDuplicates = asyncHandler(async (req, res) => {
+  const issue = await Issue.findById(req.params.id);
+  if (!issue) return res.status(404).json({ message: 'Issue not found' });
+  const potentialDuplicates = await findPotentialDuplicates({
+    title: issue.title,
+    category: issue.category,
+    locationText: issue.locationText,
+    excludeId: issue._id
+  });
+  res.json({ count: potentialDuplicates.length, potentialDuplicates });
+});
+
 export const createIssue = asyncHandler(async (req, res) => {
-  const issue = await Issue.create({ ...req.body, reporterId: req.user._id });
-  await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: 'Submitted', newStatus: 'Submitted', note: 'Issue reported' });
-  res.status(201).json({ issue: await issue.populate('reporterId', 'name') });
+  const { title, category, description, locationText, priority } = req.body;
+
+  // Validate required fields (since multer parses as multipart, Zod doesn't run)
+  const errors = [];
+  if (!title || title.trim().length < 5 || title.trim().length > 120) errors.push('Title must be 5–120 characters');
+  if (!category || !CATEGORIES.includes(category)) errors.push('Invalid category');
+  if (!description || description.trim().length < 15 || description.trim().length > 1500) errors.push('Description must be 15–1500 characters');
+  if (!locationText || locationText.trim().length < 3 || locationText.trim().length > 160) errors.push('Location must be 3–160 characters');
+  if (priority && !PRIORITIES.includes(priority)) errors.push('Invalid priority');
+  if (errors.length) return res.status(400).json({ message: errors.join('. ') });
+
+  // Detect potential duplicates
+  const potentialDuplicates = await findPotentialDuplicates({
+    title: title.trim(),
+    category,
+    locationText: locationText.trim()
+  });
+
+  const issueData = {
+    title: title.trim(),
+    category,
+    description: description.trim(),
+    locationText: locationText.trim(),
+    priority: priority || 'Medium',
+    reporterId: req.user._id,
+    imageUrl: req.file ? `/uploads/${req.file.filename}` : '',
+    isPotentialDuplicate: potentialDuplicates.length > 0,
+    possibleDuplicateIds: potentialDuplicates.map(d => d._id)
+  };
+
+  const issue = await Issue.create(issueData);
+  const note = potentialDuplicates.length > 0
+    ? `Issue reported (Flagged for review: ${potentialDuplicates.length} similar active issue(s) detected)`
+    : 'Issue reported';
+  await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: 'Submitted', newStatus: 'Submitted', note });
+  res.status(201).json({ issue: await issue.populate('reporterId', 'name'), potentialDuplicates });
 });
 
 const buildFilter = query => {
@@ -36,18 +93,66 @@ export const myIssues = asyncHandler(async (req, res) => {
   res.json({ issues: await Issue.find(filter).sort({ createdAt: -1 }) });
 });
 
+export const listCommunityReviews = asyncHandler(async (req, res) => {
+  const reviews = await IssueUpdate.find({ note: { $exists: true, $ne: '' } })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .populate('actorId', 'name role')
+    .populate('issueId', 'title category status locationText priority');
+
+  const validReviews = reviews
+    .filter(r => r.issueId && r.actorId)
+    .map(r => ({
+      _id: r._id,
+      note: r.note,
+      oldStatus: r.oldStatus,
+      newStatus: r.newStatus,
+      createdAt: r.createdAt,
+      author: {
+        name: r.actorId.name,
+        role: r.actorId.role
+      },
+      issue: {
+        _id: r.issueId._id,
+        title: r.issueId.title,
+        category: r.issueId.category,
+        status: r.issueId.status,
+        locationText: r.issueId.locationText,
+        priority: r.issueId.priority
+      }
+    }));
+
+  res.json({ reviews: validReviews });
+});
+
 export const getIssue = asyncHandler(async (req, res) => {
   const viewer = req.user.role === 'viewer';
   const issueQuery = Issue.findById(req.params.id);
   if (viewer) issueQuery.select('-reporterId');
-  else issueQuery.populate('reporterId', 'name');
+  else issueQuery.populate('reporterId', 'name').populate('possibleDuplicateIds', 'title status category locationText priority createdAt');
   const issue = await issueQuery;
   if (!issue) return res.status(404).json({ message: 'Issue not found' });
   const updatesQuery = IssueUpdate.find({ issueId: issue._id }).sort({ createdAt: 1 });
   if (viewer) updatesQuery.select('oldStatus newStatus createdAt');
   else updatesQuery.populate('actorId', 'name role');
   const updates = await updatesQuery;
-  res.json({ issue, updates });
+
+  // Include community reviews so viewers and reporters can see community feedback
+  const reviews = await IssueUpdate.find({ issueId: issue._id, note: { $exists: true, $ne: '' } })
+    .sort({ createdAt: 1 })
+    .populate('actorId', 'name role');
+
+  const formattedReviews = reviews.map(r => ({
+    _id: r._id,
+    note: r.note,
+    createdAt: r.createdAt,
+    author: {
+      name: r.actorId?.name || 'Community Member',
+      role: r.actorId?.role || 'reporter'
+    }
+  }));
+
+  res.json({ issue, updates, reviews: formattedReviews });
 });
 
 export const updateStatus = asyncHandler(async (req, res) => {
