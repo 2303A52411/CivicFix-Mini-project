@@ -46,4 +46,38 @@ describe('CivicFix API',()=>{
    expect(createdDuplicate.status).toBe(201);
    expect(createdDuplicate.body.issue.isPotentialDuplicate).toBe(true);
  });
+ it('allows reporters to submit reviews with ratings and provides public reviews list', async () => {
+   const created = await request(app).post('/api/issues').set(auth('reporter')).send(issue);
+   const id = created.body.issue._id;
+   const repReview = await request(app).post(`/api/issues/${id}/updates`).set(auth('reporter')).send({
+     note: 'Reporting experience was smooth and fast.',
+     rating: 4,
+     isReview: true,
+     reviewStage: 'reporting'
+   });
+   expect(repReview.status).toBe(201);
+   expect(repReview.body.update.reviewStage).toBe('reporting');
+   await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({ status: 'Under Review' });
+   await request(app).patch(`/api/issues/${id}/status`).set(auth('coordinator')).send({ status: 'In Progress' });
+   await request(app).patch(`/api/issues/${id}/resolve`).set(auth('coordinator')).send({ resolutionNote: 'Fixed street light bulb.' });
+
+   const reviewRes = await request(app).post(`/api/issues/${id}/updates`).set(auth('reporter')).send({
+     note: 'Super fast fix and very polite team! Fully working now.',
+     rating: 5
+   });
+   expect(reviewRes.status).toBe(201);
+   expect(reviewRes.body.update.rating).toBe(5);
+   expect(reviewRes.body.update.note).toContain('Super fast fix');
+
+   const publicReviews = await request(app).get('/api/issues/reviews');
+   expect(publicReviews.status).toBe(200);
+   expect(publicReviews.body.reviews.some(r => r.note.includes('Issue reported'))).toBe(false);
+   expect(publicReviews.body.reviews.some(r => r.note.includes('Fixed street light bulb.'))).toBe(false);
+   expect(publicReviews.body.reviews.length).toBeGreaterThan(0);
+   const rev = publicReviews.body.reviews.find(r => r.issue._id === id);
+   expect(rev).toBeDefined();
+   expect(rev.rating).toBe(5);
+   expect(rev.author.name).toBe('reporter');
+   expect(rev.createdAt).toBeDefined();
+ });
 });

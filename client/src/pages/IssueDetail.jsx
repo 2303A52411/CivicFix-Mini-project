@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, User, AlertTriangle, ExternalLink, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, User, AlertTriangle, ExternalLink, MessageSquare, Send, Star, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useParams } from 'react-router-dom';
@@ -18,6 +18,8 @@ export default function IssueDetail() {
   const [status, setStatus] = useState('');
   const [note, setNote] = useState('');
   const [reviewNote, setReviewNote] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [saving, setSaving] = useState(false);
   const [postingReview, setPostingReview] = useState(false);
 
@@ -58,12 +60,18 @@ export default function IssueDetail() {
     if (!reviewNote.trim()) return;
     setPostingReview(true);
     try {
-      await api.post(`/issues/${id}/updates`, { note: reviewNote.trim() });
-      toast.success('Review note added to timeline');
+      const isResolved = data?.issue?.status === 'Resolved';
+      await api.post(`/issues/${id}/updates`, {
+        note: reviewNote.trim(),
+        rating: reviewRating,
+        isReview: true,
+        reviewStage: isResolved ? 'resolution' : 'reporting'
+      });
+      toast.success(isResolved ? 'Thank you! Your resolution review and rating have been recorded.' : 'Thank you! Your reporting review and rating have been posted.');
       setReviewNote('');
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not post review note');
+      toast.error(err.response?.data?.message || 'Could not post review');
     } finally {
       setPostingReview(false);
     }
@@ -168,40 +176,149 @@ export default function IssueDetail() {
         </div>
       )}
 
-      {/* Option to Write a Review / Community Note */}
+      {/* Review & Resolution Feedback / Community Note */}
       {user?.role !== 'viewer' ? (
-        <div className="card mt-6 border-slate-200 p-6 sm:p-8">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-brand-600" />
-            <h2 className="text-xl font-bold">Write a Review or Update</h2>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Add a community note, share additional details, or leave feedback on this issue. Your note will appear in the public status timeline.
-          </p>
-
-          <form onSubmit={handlePostReview} className="mt-4 space-y-4">
-            <textarea
-              className="field min-h-24 resize-y"
-              required
-              minLength={2}
-              maxLength={1000}
-              placeholder="Write your review, community note, or resolution feedback here…"
-              value={reviewNote}
-              onChange={e => setReviewNote(e.target.value)}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">{reviewNote.length}/1000</span>
-              <button
-                type="submit"
-                disabled={postingReview || reviewNote.trim().length < 2}
-                className="btn-primary inline-flex items-center gap-1.5 py-2 px-4 text-xs"
-              >
-                <Send className="h-3.5 w-3.5" />
-                {postingReview ? 'Posting…' : 'Post Note / Review'}
-              </button>
+        issue.status === 'Resolved' ? (
+          <div className="card mt-6 border-amber-200 bg-amber-50/30 p-6 sm:p-8">
+            <div className="flex items-center gap-2">
+              <Star className="h-6 w-6 text-amber-500 fill-amber-400" />
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Rate & Review Resolution</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  This issue has been resolved! Please rate the repair quality and share your feedback for the community.
+                </p>
+              </div>
             </div>
-          </form>
-        </div>
+
+            {/* Star Rating Selector */}
+            <div className="mt-5 rounded-xl border border-amber-100 bg-white p-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Your Rating: <span className="text-amber-600 font-bold normal-case text-sm">
+                  {['', '1 Star (Poor)', '2 Stars (Fair)', '3 Stars (Good)', '4 Stars (Very Good)', '5 Stars (Excellent)'][hoverRating || reviewRating]}
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    type="button"
+                    onMouseEnter={() => setHoverRating(star)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={() => setReviewRating(star)}
+                    className="p-1 transition hover:scale-125 focus:outline-none"
+                    aria-label={`Rate ${star} stars`}
+                  >
+                    <Star
+                      className={`h-7 w-7 transition-colors ${
+                        star <= (hoverRating || reviewRating)
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'text-slate-300'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handlePostReview} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Written Review
+                </label>
+                <textarea
+                  className="field min-h-24 resize-y bg-white"
+                  required
+                  minLength={2}
+                  maxLength={1000}
+                  placeholder="How was the issue resolved? Share details about promptness, repair quality, or community impact…"
+                  value={reviewNote}
+                  onChange={e => setReviewNote(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{reviewNote.length}/1000</span>
+                <button
+                  type="submit"
+                  disabled={postingReview || reviewNote.trim().length < 2}
+                  className="btn-primary inline-flex items-center gap-2 py-2.5 px-5 text-sm"
+                >
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  {postingReview ? 'Submitting…' : 'Submit Rating & Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="card mt-6 border-blue-100 bg-blue-50/20 p-6 sm:p-8">
+            <div className="flex items-center gap-2">
+              <Star className="h-6 w-6 text-brand-600 fill-brand-400" />
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Review Reporting Experience</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Rate your reporting experience and add community feedback while this issue is <span className="font-semibold text-brand-700">{issue.status}</span>. Once marked <span className="font-semibold text-emerald-700">Resolved</span>, you can also rate the final fix!
+                </p>
+              </div>
+            </div>
+
+            {/* Star Rating Selector */}
+            <div className="mt-5 rounded-xl border border-blue-100 bg-white p-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Your Rating: <span className="text-brand-600 font-bold normal-case text-sm">
+                  {['', '1 Star (Poor)', '2 Stars (Fair)', '3 Stars (Good)', '4 Stars (Very Good)', '5 Stars (Excellent)'][hoverRating || reviewRating]}
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    type="button"
+                    onMouseEnter={() => setHoverRating(star)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={() => setReviewRating(star)}
+                    className="p-1 transition hover:scale-125 focus:outline-none"
+                    aria-label={`Rate ${star} stars`}
+                  >
+                    <Star
+                      className={`h-7 w-7 transition-colors ${
+                        star <= (hoverRating || reviewRating)
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'text-slate-300'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handlePostReview} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Report Feedback & Community Notes
+                </label>
+                <textarea
+                  className="field min-h-24 resize-y bg-white"
+                  required
+                  minLength={2}
+                  maxLength={1000}
+                  placeholder="Share details on your reporting experience, urgency, or extra notes for the community…"
+                  value={reviewNote}
+                  onChange={e => setReviewNote(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{reviewNote.length}/1000</span>
+                <button
+                  type="submit"
+                  disabled={postingReview || reviewNote.trim().length < 2}
+                  className="btn-primary inline-flex items-center gap-2 py-2.5 px-5 text-sm"
+                >
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  {postingReview ? 'Submitting…' : 'Submit Reporting Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )
       ) : (
         <div className="card mt-6 border-slate-100 bg-slate-50/70 p-5 text-center text-xs text-slate-500">
           Viewing in read-only mode. Sign in as a <strong>Reporter</strong> or <strong>Coordinator</strong> to post reviews and updates.
@@ -287,21 +404,58 @@ export default function IssueDetail() {
       {data.reviews && data.reviews.length > 0 && (
         <div className="card mt-6 p-6 sm:p-8">
           <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-brand-600" />
+            <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
             <h2 className="text-xl font-bold">Community Reviews & Feedback ({data.reviews.length})</h2>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Read comments and reviews shared by community reporters and residents.
+            Ratings and reviews submitted by reporters and residents after issue resolution.
           </p>
           <div className="mt-4 space-y-3">
             {data.reviews.map(rev => (
               <div key={rev._id} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
-                <p className="text-sm text-slate-800 leading-relaxed italic">"{rev.note}"</p>
-                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-700">
-                    {rev.author?.name || 'Community Member'} <span className="font-normal capitalize text-brand-600">({rev.author?.role || 'reporter'})</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= (rev.rating || 5)
+                            ? 'fill-amber-400 text-amber-400'
+                            : 'text-slate-200'
+                        }`}
+                      />
+                    ))}
+                    <span className="ml-1 text-xs font-bold text-slate-700">
+                      ({rev.rating || 5}/5)
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {new Date(rev.createdAt).toLocaleString()}
                   </span>
-                  <span>{new Date(rev.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="text-sm text-slate-800 leading-relaxed italic">"{rev.note}"</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/60 pt-2">
+                  <span className="font-semibold text-slate-700">
+                    {rev.author?.name || 'Community Member'}{' '}
+                    <span className="font-normal capitalize text-brand-600">
+                      ({rev.author?.role || 'reporter'})
+                    </span>
+                    {user?.name && rev.author?.name === user.name && (
+                      <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                        You
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      rev.reviewStage === 'resolution'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {rev.reviewStage === 'resolution' ? 'Resolution Review' : 'Report Review'}
+                    </span>
+                    <span className="text-[11px] text-slate-400">Verified</span>
+                  </div>
                 </div>
               </div>
             ))}

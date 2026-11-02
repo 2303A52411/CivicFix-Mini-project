@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { addUpdate, checkDuplicates, createIssue, getIssue, getIssueDuplicates, listCommunityReviews, listIssues, resolveIssue, summary, updateStatus } from '../controllers/issueController.js';
-import { allow, protect } from '../middleware/auth.js';
+import { allow, protect, protectOptional } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { noteSchema, resolveSchema, statusSchema } from '../validators/schemas.js';
 import { upload, handleUploadError } from '../middleware/upload.js';
 const router = Router();
 router.get('/', protect, listIssues);
 router.get('/summary', summary);
-router.get('/reviews', protect, listCommunityReviews);
+router.get('/reviews', protectOptional, listCommunityReviews);
 router.post('/check-duplicates', protect, checkDuplicates);
 router.get('/check-duplicates', protect, checkDuplicates);
 router.get('/:id', protect, getIssue);

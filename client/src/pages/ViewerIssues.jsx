@@ -1,4 +1,4 @@
-import { CalendarDays, Eye, MapPin, Search, SlidersHorizontal, MessageSquare, CheckCircle2, User } from 'lucide-react';
+import { CalendarDays, Eye, MapPin, Search, SlidersHorizontal, MessageSquare, CheckCircle2, User, Star } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
@@ -273,12 +273,33 @@ export default function ViewerIssues() {
                     </span>
                   </div>
 
-                  <p className="mt-3 text-sm text-slate-700 italic leading-relaxed">
+                  <div className="mt-2.5 flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star
+                        key={star}
+                        className={`h-3.5 w-3.5 ${
+                          star <= (rev.rating || 5)
+                            ? 'fill-amber-400 text-amber-400'
+                            : 'text-slate-200'
+                        }`}
+                      />
+                    ))}
+                    <span className="ml-1 text-xs font-bold text-slate-700">
+                      ({rev.rating || 5}/5)
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm text-slate-700 italic leading-relaxed">
                     "{rev.note}"
                   </p>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                     <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        rev.reviewStage === 'resolution' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {rev.reviewStage === 'resolution' ? 'Resolution' : 'Report'}
+                      </span>
                       <StatusBadge status={rev.issue?.status || 'Submitted'} />
                       <span className="font-medium text-slate-700 truncate max-w-[180px]">
                         {rev.issue?.title}

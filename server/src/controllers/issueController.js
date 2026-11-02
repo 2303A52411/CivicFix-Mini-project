@@ -64,7 +64,7 @@ export const createIssue = asyncHandler(async (req, res) => {
   const note = potentialDuplicates.length > 0
     ? `Issue reported (Flagged for review: ${potentialDuplicates.length} similar active issue(s) detected)`
     : 'Issue reported';
-  await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: 'Submitted', newStatus: 'Submitted', note });
+  await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: 'Submitted', newStatus: 'Submitted', note, isReview: false });
   res.status(201).json({ issue: await issue.populate('reporterId', 'name'), potentialDuplicates });
 });
 
@@ -94,21 +94,27 @@ export const myIssues = asyncHandler(async (req, res) => {
 });
 
 export const listCommunityReviews = asyncHandler(async (req, res) => {
-  const reviews = await IssueUpdate.find({ note: { $exists: true, $ne: '' } })
+  const reviews = await IssueUpdate.find({
+    $or: [{ isReview: true }, { rating: { $ne: null } }],
+    note: { $exists: true, $ne: '' }
+  })
     .sort({ createdAt: -1 })
     .limit(50)
     .populate('actorId', 'name role')
-    .populate('issueId', 'title category status locationText priority');
+    .populate('issueId', 'title category status locationText priority rating');
 
   const validReviews = reviews
     .filter(r => r.issueId && r.actorId)
     .map(r => ({
       _id: r._id,
       note: r.note,
+      rating: r.rating || (r.issueId?.rating || 5),
+      reviewStage: r.reviewStage || (r.oldStatus === 'Resolved' || r.newStatus === 'Resolved' ? 'resolution' : 'reporting'),
       oldStatus: r.oldStatus,
       newStatus: r.newStatus,
       createdAt: r.createdAt,
       author: {
+        _id: r.actorId._id,
         name: r.actorId.name,
         role: r.actorId.role
       },
@@ -138,15 +144,22 @@ export const getIssue = asyncHandler(async (req, res) => {
   const updates = await updatesQuery;
 
   // Include community reviews so viewers and reporters can see community feedback
-  const reviews = await IssueUpdate.find({ issueId: issue._id, note: { $exists: true, $ne: '' } })
-    .sort({ createdAt: 1 })
+  const reviews = await IssueUpdate.find({
+    issueId: issue._id,
+    $or: [{ isReview: true }, { rating: { $ne: null } }],
+    note: { $exists: true, $ne: '' }
+  })
+    .sort({ createdAt: -1 })
     .populate('actorId', 'name role');
 
   const formattedReviews = reviews.map(r => ({
     _id: r._id,
     note: r.note,
+    rating: r.rating || (issue.rating || null),
+    reviewStage: r.reviewStage || (issue.status === 'Resolved' ? 'resolution' : 'reporting'),
     createdAt: r.createdAt,
     author: {
+      _id: r.actorId?._id,
       name: r.actorId?.name || 'Community Member',
       role: r.actorId?.role || 'reporter'
     }
@@ -166,7 +179,23 @@ export const updateStatus = asyncHandler(async (req, res) => {
 export const addUpdate = asyncHandler(async (req, res) => {
   const issue = await Issue.findById(req.params.id);
   if (!issue) return res.status(404).json({ message: 'Issue not found' });
-  const update = await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: issue.status, newStatus: issue.status, note: req.body.note });
+  const isReview = req.body.isReview === true || req.body.rating !== undefined;
+  const rating = req.body.rating ? Number(req.body.rating) : null;
+  const reviewStage = req.body.reviewStage || (issue.status === 'Resolved' ? 'resolution' : 'reporting');
+  const update = await IssueUpdate.create({
+    issueId: issue._id,
+    actorId: req.user._id,
+    oldStatus: issue.status,
+    newStatus: issue.status,
+    note: req.body.note,
+    rating,
+    isReview,
+    reviewStage: isReview ? reviewStage : null
+  });
+  if (rating) {
+    issue.rating = rating;
+    await issue.save();
+  }
   res.status(201).json({ update: await update.populate('actorId', 'name role') });
 });
 
