@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
-import landingHero from '../assets/civicfix-landing-hero.png';
 
 const priorityStyle = { Low:'bg-emerald-50 text-emerald-700', Medium:'bg-amber-50 text-amber-700', High:'bg-rose-50 text-rose-700', Urgent:'bg-red-50 text-red-700' };
 
@@ -43,10 +42,8 @@ export default function ReporterDashboard() {
   ];
 
   return <div className="space-y-6">
-    <section className="relative overflow-hidden rounded-3xl bg-sky-50 px-6 py-9 sm:px-8 lg:min-h-52">
-      <img src={landingHero} alt="" className="absolute inset-0 h-full w-full object-cover object-center opacity-90"/>
-      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/10"/>
-      <div className="relative z-10 max-w-xl">
+    <section className="rounded-2xl border border-brand-100 bg-brand-50 px-6 py-8 sm:px-8">
+      <div className="max-w-xl">
         <p className="text-xs font-extrabold uppercase tracking-wide text-brand-600">Reporter dashboard</p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome back, <span className="text-brand-600">{user?.name?.split(' ')[0] || 'Reporter'}!</span></h1>
         <p className="mt-3 max-w-lg leading-7 text-slate-600">Report problems and follow every step toward a cleaner, safer, and happier community.</p>
