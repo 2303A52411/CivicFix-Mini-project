@@ -61,9 +61,7 @@ export const createIssue = asyncHandler(async (req, res) => {
   };
 
   const issue = await Issue.create(issueData);
-  const note = potentialDuplicates.length > 0
-    ? `Issue reported (Flagged for review: ${potentialDuplicates.length} similar active issue(s) detected)`
-    : 'Issue reported';
+  const note = 'Issue reported';
   await IssueUpdate.create({ issueId: issue._id, actorId: req.user._id, oldStatus: 'Submitted', newStatus: 'Submitted', note, isReview: false });
   res.status(201).json({ issue: await issue.populate('reporterId', 'name'), potentialDuplicates });
 });

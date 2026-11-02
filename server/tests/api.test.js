@@ -45,6 +45,13 @@ describe('CivicFix API',()=>{
    });
    expect(createdDuplicate.status).toBe(201);
    expect(createdDuplicate.body.issue.isPotentialDuplicate).toBe(true);
+   const diffIssueCheck = await request(app).post('/api/issues/check-duplicates').set(auth('reporter')).send({
+     title: 'Wifi router not working in Block A',
+     category: 'Electrical',
+     locationText: 'Block A'
+   });
+   expect(diffIssueCheck.status).toBe(200);
+   expect(diffIssueCheck.body.count).toBe(0);
  });
  it('allows reporters to submit reviews with ratings and provides public reviews list', async () => {
    const created = await request(app).post('/api/issues').set(auth('reporter')).send(issue);
@@ -79,5 +86,34 @@ describe('CivicFix API',()=>{
    expect(rev.rating).toBe(5);
    expect(rev.author.name).toBe('reporter');
    expect(rev.createdAt).toBeDefined();
+ });
+ it('supports Google authentication for quick signup, login, and account linking', async () => {
+   // 1. Google signup for a new user
+   const googleRes = await request(app).post('/api/auth/google').send({
+     credential: 'mock-google-token-123',
+     email: 'google_reporter@civicfix.test',
+     name: 'Google Reporter',
+     googleId: 'g_sub_123456789'
+   });
+   expect(googleRes.status).toBe(200);
+   expect(googleRes.body.token).toBeDefined();
+   expect(googleRes.body.user.email).toBe('google_reporter@civicfix.test');
+   expect(googleRes.body.user.role).toBe('reporter');
+   expect(googleRes.body.user.authProvider).toBe('google');
+
+   // 2. Token authenticates me endpoint
+   const meRes = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${googleRes.body.token}` });
+   expect(meRes.status).toBe(200);
+   expect(meRes.body.user.name).toBe('Google Reporter');
+
+   // 3. Linking existing email user with Google auth
+   const linkRes = await request(app).post('/api/auth/google').send({
+     credential: 'mock-google-token-link',
+     email: 'reporter@test.com',
+     googleId: 'g_sub_reporter_linked'
+   });
+   expect(linkRes.status).toBe(200);
+   expect(linkRes.body.user.email).toBe('reporter@test.com');
+   expect(linkRes.body.user.role).toBe('reporter');
  });
 });

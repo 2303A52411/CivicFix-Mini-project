@@ -1,18 +1,40 @@
 import Issue from '../models/Issue.js';
 
+// Common stop words, prepositions, and generic maintenance filler words
 const STOP_WORDS = new Set([
-  'the', 'is', 'are', 'was', 'were', 'at', 'by', 'for', 'from', 'in', 'into',
-  'of', 'on', 'to', 'with', 'and', 'or', 'not', 'near', 'beside', 'behind',
-  'front', 'area', 'this', 'that', 'there', 'please', 'help', 'need', 'needs',
-  'some', 'very', 'been', 'have', 'has', 'had', 'our', 'out', 'all', 'any'
+  // Articles & Prepositions
+  'the', 'is', 'are', 'was', 'were', 'am', 'be', 'been', 'being',
+  'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'onto', 'to', 'with', 'within',
+  'and', 'or', 'not', 'no', 'nor', 'but', 'so', 'as', 'if',
+  'near', 'beside', 'behind', 'front', 'area', 'this', 'that', 'these', 'those',
+  'there', 'here', 'please', 'help', 'need', 'needs', 'needed',
+  'some', 'very', 'have', 'has', 'had', 'having', 'our', 'out', 'all', 'any', 'my', 'your',
+  // Generic maintenance filler words
+  'issue', 'issues', 'problem', 'problems', 'complaint', 'complaints',
+  'trouble', 'report', 'reports', 'reported', 'reporting',
+  'repair', 'repairs', 'repaired', 'fixing', 'fixed', 'fix',
+  'work', 'working', 'works', 'bad', 'poor', 'urgent', 'immediately',
+  'check', 'checking', 'today', 'yesterday', 'daily', 'again', 'still'
 ]);
 
-export const extractKeywords = (text = '') => {
+// Generic location descriptors (keep specific block/room identifiers like 'a', 'b', '101', 'main', etc.)
+const GENERIC_LOCATION_WORDS = new Set([
+  'block', 'blocks', 'room', 'rooms', 'floor', 'floors', 'building', 'wing',
+  'dept', 'department', 'hall', 'campus', 'hostel', 'lane', 'street', 'road',
+  'side', 'near', 'corner', 'gate', 'ground', 'behind', 'front', 'phase'
+]);
+
+export const extractKeywords = (text = '', customStopWords = STOP_WORDS) => {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter(word => word.length >= 3 && !STOP_WORDS.has(word));
+    .filter(word => {
+      if (!word) return false;
+      if (customStopWords.has(word)) return false;
+      // Allow single alphanumeric identifiers (e.g., 'a', 'b', '1', '2' for Block A, Block B, etc.)
+      return word.length >= 1;
+    });
 };
 
 const calculateWordOverlap = (wordsA, wordsB) => {
@@ -28,11 +50,17 @@ const calculateWordOverlap = (wordsA, wordsB) => {
 export const findPotentialDuplicates = async ({ title, category, locationText, excludeId = null }) => {
   if (!title || title.trim().length < 3) return [];
 
-  const titleWords = extractKeywords(title);
-  const locationWords = extractKeywords(locationText);
+  const titleWords = extractKeywords(title, STOP_WORDS);
+  const locationStopWords = new Set([...STOP_WORDS, ...GENERIC_LOCATION_WORDS]);
+  const locationWords = extractKeywords(locationText, locationStopWords);
 
-  // Only search active, unresolved issues (exclude 'Resolved' and 'Rejected')
+  const effectiveTitleWords = titleWords.length > 0
+    ? titleWords
+    : title.toLowerCase().split(/\s+/).filter(w => w.length >= 2);
+
+  // STRICT REQUIREMENT 1: Category MUST match exactly
   const filter = {
+    category,
     status: { $in: ['Submitted', 'Under Review', 'In Progress'] }
   };
 
@@ -40,73 +68,66 @@ export const findPotentialDuplicates = async ({ title, category, locationText, e
     filter._id = { $ne: excludeId };
   }
 
-  // Find candidate issues in same category or matching keywords
+  // Find candidate active issues in the exact same category
   const candidates = await Issue.find(filter)
     .populate('reporterId', 'name')
     .sort({ createdAt: -1 })
     .limit(100);
 
   const scored = [];
+  const normInputTitle = title.trim().toLowerCase().replace(/\s+/g, ' ');
 
   for (const candidate of candidates) {
-    const candTitleWords = extractKeywords(candidate.title);
-    const candLocationWords = extractKeywords(candidate.locationText);
-
-    const titleOverlap = calculateWordOverlap(titleWords, candTitleWords);
+    // STRICT REQUIREMENT 2: Location / Block MUST match
+    const candLocationWords = extractKeywords(candidate.locationText, locationStopWords);
     const locationOverlap = calculateWordOverlap(locationWords, candLocationWords);
-    const sameCategory = candidate.category === category;
 
-    // Check exact normalized title
-    const normInputTitle = title.trim().toLowerCase();
-    const normCandTitle = candidate.title.trim().toLowerCase();
+    // If locations do not match (e.g. Block A vs Block B), it is NOT a duplicate
+    if (locationOverlap === 0) {
+      continue;
+    }
+
+    // STRICT REQUIREMENT 3: Issue Title / Subject MUST match
+    const candTitleWords = extractKeywords(candidate.title, STOP_WORDS);
+    const effectiveCandTitleWords = candTitleWords.length > 0
+      ? candTitleWords
+      : candidate.title.toLowerCase().split(/\s+/).filter(w => w.length >= 2);
+
+    const normCandTitle = candidate.title.trim().toLowerCase().replace(/\s+/g, ' ');
     const isExactTitle = normInputTitle === normCandTitle;
 
-    let score = 0;
-    const reasons = [];
+    const titleOverlap = calculateWordOverlap(effectiveTitleWords, effectiveCandTitleWords);
+    const isSubstringMatch = (normInputTitle.length >= 5 && normCandTitle.includes(normInputTitle)) ||
+                             (normCandTitle.length >= 5 && normInputTitle.includes(normCandTitle));
 
-    if (isExactTitle) {
-      score += 65;
-      reasons.push('Identical title');
-    } else if (titleOverlap >= 2) {
-      score += Math.min(titleOverlap * 20, 50);
-      reasons.push(`Shared title keywords (${titleOverlap} matches)`);
-    } else if (titleOverlap === 1 && candTitleWords.length <= 3) {
-      score += 25;
-      reasons.push('Key title match');
+    // If title has no meaningful overlap or substring match, it is NOT a duplicate
+    if (!isExactTitle && titleOverlap === 0 && !isSubstringMatch) {
+      continue;
     }
 
-    if (sameCategory) {
-      score += 25;
-      reasons.push(`Same category (${category})`);
-    }
+    // All 3 conditions satisfied (Category + Block/Location + Title): Calculate confidence score
+    let titleScore = isExactTitle ? 70 : isSubstringMatch ? 55 : Math.min(35 + titleOverlap * 15, 65);
+    let locationScore = Math.min(20 + locationOverlap * 10, 30);
+    let categoryScore = 15; // Same category
 
-    if (locationOverlap >= 1) {
-      score += Math.min(locationOverlap * 20, 30);
-      reasons.push(`Matching location keywords (${candidate.locationText})`);
-    }
+    const totalScore = Math.min(titleScore + locationScore + categoryScore, 100);
 
-    // Active status penalty/bonus: Active issues are much more likely duplicates than resolved ones
-    if (['Submitted', 'Under Review', 'In Progress'].includes(candidate.status)) {
-      score += 10;
-      reasons.push(`Currently ${candidate.status}`);
-    }
+    const matchingWords = effectiveTitleWords.filter(w => effectiveCandTitleWords.includes(w));
+    const matchingLocation = locationWords.filter(w => candLocationWords.includes(w));
 
-    // If score crosses confidence threshold (>= 45%), consider it a potential duplicate
-    if (score >= 45) {
-      scored.push({
-        _id: candidate._id,
-        title: candidate.title,
-        category: candidate.category,
-        locationText: candidate.locationText,
-        priority: candidate.priority,
-        status: candidate.status,
-        imageUrl: candidate.imageUrl,
-        createdAt: candidate.createdAt,
-        reporterName: candidate.reporterId?.name || 'Reporter',
-        similarityScore: Math.min(score, 100),
-        matchReason: reasons.join(' • ')
-      });
-    }
+    scored.push({
+      _id: candidate._id,
+      title: candidate.title,
+      category: candidate.category,
+      locationText: candidate.locationText,
+      priority: candidate.priority,
+      status: candidate.status,
+      imageUrl: candidate.imageUrl,
+      createdAt: candidate.createdAt,
+      reporterName: candidate.reporterId?.name || 'Reporter',
+      similarityScore: totalScore,
+      matchReason: `Matching category (${category}) • Block (${matchingLocation.join(', ') || candidate.locationText}) • Title (${matchingWords.join(', ') || candidate.title})`
+    });
   }
 
   // Sort by highest similarity first, then newest
@@ -114,4 +135,3 @@ export const findPotentialDuplicates = async ({ title, category, locationText, e
 
   return scored.slice(0, 5);
 };
-
